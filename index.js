@@ -139,6 +139,7 @@ async function run() {
     await client.connect();
     const db = client.db("sbssbuDb");
     userCollection = db.collection("users");
+    registrationsCollection = db.collection("registrations");
     // const parcelCollection = db.collection("parcels");
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
@@ -177,75 +178,12 @@ app.post("/users", async (req, res) => {
 });
 
 // Registration endpoint - requires verified Firebase token
-app.post("/register", verifyFBToken, async (req, res) => {
-  try {
-    if (!userCollection) {
-      return res.status(503).send({ message: "Database is not ready" });
-    }
 
-    const { programmeId, studentType, contactPhone, notes } = req.body;
-    const userEmail = req.decoded_email;
-
-    // Validate required fields
-    if (!programmeId || !studentType || !contactPhone) {
-      return res.status(400).send({ 
-        message: "Missing required fields: programmeId, studentType, contactPhone" 
-      });
-    }
-
-    // Validate student type
-    if (!['current_student', 'alumni'].includes(studentType)) {
-      return res.status(400).send({ 
-        message: "Invalid student type. Must be 'current_student' or 'alumni'" 
-      });
-    }
-
-    // Check if user already registered for this programme
-    const registrationsCollection = client.db("sbssbuDb").collection("registrations");
-    const existingReg = await registrationsCollection.findOne({
-      email: userEmail,
-      programmeId: parseInt(programmeId)
-    });
-
-    if (existingReg) {
-      return res.status(400).send({ 
-        message: "You have already registered for this programme" 
-      });
-    }
-
-    // Create registration record
-    const registration = {
-      email: userEmail,
-      programmeId: parseInt(programmeId),
-      studentType,
-      contactPhone,
-      notes: notes || "",
-      registeredAt: new Date(),
-      status: "pending"
-    };
-
-    const result = await registrationsCollection.insertOne(registration);
-    
-    res.send({ 
-      success: true, 
-      message: "Registration successful",
-      registrationId: result.insertedId 
-    });
-  } catch (err) {
-    console.error("Registration error:", err);
-    res.status(500).send({ message: "Registration failed", error: err.message });
-  }
-});
 
 // Programme Registration endpoint - accepts form submissions
 app.post("/registration", async (req, res) => {
   try {
-    if (!client.topology || !client.topology.isConnected()) {
-      return res.status(503).send({ message: "Database is not ready" });
-    }
-
-    const db = client.db("sbssbuDb");
-    const registrationsCollection = db.collection("registrations");
+    
     
     const {
       name_bn,
