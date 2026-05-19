@@ -237,6 +237,78 @@ app.post("/register", verifyFBToken, async (req, res) => {
   }
 });
 
+// Programme Registration endpoint - accepts form submissions
+app.post("/registration", async (req, res) => {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      return res.status(503).send({ message: "Database is not ready" });
+    }
+
+    const db = client.db("sbssbuDb");
+    const registrationsCollection = db.collection("registrations");
+    
+    const {
+      name_bn,
+      sabek_bortoman,
+      songotonik_man,
+      daitto,
+      imageUrl,
+      organizational_branch,
+      tshirt_size,
+      sendmoney_number,
+      transaction_Id,
+      phone_number,
+      whatsapp_number,
+      present_area,
+      present_thana,
+      present_zilla,
+      permanent_union,
+      permanent_ward
+    } = req.body;
+
+    // Validate required fields
+    if (!name_bn || !phone_number || !transaction_Id) {
+      return res.status(400).send({
+        message: "Missing required fields: name_bn, phone_number, transaction_Id"
+      });
+    }
+
+    // Create registration record
+    const registration = {
+      name_bn,
+      sabek_bortoman,
+      songotonik_man,
+      daitto,
+      imageUrl: imageUrl || "",
+      organizational_branch,
+      tshirt_size,
+      sendmoney_number,
+      transaction_Id,
+      phone_number,
+      whatsapp_number,
+      present_area,
+      present_thana,
+      present_zilla,
+      permanent_union,
+      permanent_ward,
+      registration_status: "pending",
+      registered_at: new Date(),
+      ip_address: req.ip || req.connection.remoteAddress
+    };
+
+    const result = await registrationsCollection.insertOne(registration);
+
+    res.send({
+      success: true,
+      message: "Registration successful",
+      insertedId: result.insertedId
+    });
+  } catch (err) {
+    console.error("Registration error:", err);
+    res.status(500).send({ message: "Registration failed", error: err.message });
+  }
+});
+
 app.listen(port, ()=>{
     console.log(`Server is running on port ${port}`)
 })
