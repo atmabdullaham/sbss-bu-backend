@@ -63,7 +63,15 @@ if (!initialized) {
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'https://sbssbu.web.app',
+    '' // ✅ add this line
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+}));
 app.use(express.json());
 
 
@@ -185,31 +193,6 @@ app.post("/registration", async (req, res) => {
   try {
     
     
-    const {
-      name_bn,
-      sabek_bortoman,
-      songotonik_man,
-      daitto,
-      imageUrl,
-      organizational_branch,
-      tshirt_size,
-      sendmoney_number,
-      transaction_Id,
-      phone_number,
-      whatsapp_number,
-      present_area,
-      present_thana,
-      present_zilla,
-      permanent_union,
-      permanent_ward
-    } = req.body;
-
-    // Validate required fields
-    if (!name_bn || !phone_number || !transaction_Id) {
-      return res.status(400).send({
-        message: "Missing required fields: name_bn, phone_number, transaction_Id"
-      });
-    }
 
     // Create registration record
     const registration = {
