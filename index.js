@@ -210,20 +210,8 @@ app.post("/registration", async (req, res) => {
       permanent_ward,
     } = req.body;
 
-    // Validate required fields
-    if (!name_bn || !phone_number || !transaction_Id) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing required fields: name_bn, phone_number, transaction_Id",
-      });
-    }
-
-    if (!registrationsCollection) {
-      return res.status(503).send({
-        success: false,
-        message: "Database not initialized",
-      });
-    }
+   
+   
 
     // Create registration record
     const registration = {
@@ -245,7 +233,7 @@ app.post("/registration", async (req, res) => {
       permanent_ward,
       registration_status: "pending",
       registered_at: new Date(),
-      ip_address: req.ip || req.connection.remoteAddress
+      
     };
 
     const result = await registrationsCollection.insertOne(registration);
