@@ -130,10 +130,19 @@ next()
 
 
 const uri = process.env.URI
+console.log(process.env.URI)
 let userCollection;
+let registrationsCollection;
+
+// Validate MongoDB URI exists
+if (!uri) {
+  console.error("❌ FATAL: MongoDB URI is not set!");
+  console.error("Please create a .env file with: URI=your_mongodb_connection_string");
+  console.error("See .env.example for the required format");
+}
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
+const client = new MongoClient(uri || "mongodb://localhost:27017", {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
@@ -143,6 +152,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
+    console.log("🔄 Attempting to connect to MongoDB...");
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     const db = client.db("sbssbuDb");
@@ -151,42 +161,17 @@ async function run() {
     // const parcelCollection = db.collection("parcels");
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+    console.log("✅ Successfully connected to MongoDB!");
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err.message);
+    console.error("Please check your MongoDB URI in .env file");
+    process.exit(1);
   }
 }
-run().catch(console.dir);
-
-
-app.get("/", (req, res)=>{
-    res.send("The server is running")
-    
-})
-
-// user realted middleware
-
-app.post("/users", async (req, res) => {
-  const user = req.body;
-  user.role = 'user';
-  user.createdAt = new Date()
-
-  if (!userCollection) {
-    return res.status(503).send({ message: "User collection is not ready yet" });
-  }
-
-  const existingUser = await userCollection.findOne({ email: user.email });
-  if (existingUser) {
-    return res.send({ message: "User already exists" });
-  }
-
-  const result = await userCollection.insertOne(user);
-  res.send(result);
+run().catch((err) => {
+  console.error("❌ Critical error during MongoDB connection:", err);
+  process.exit(1);
 });
-
-// Registration endpoint - requires verified Firebase token
-
 
 // Programme Registration endpoint - accepts form submissions
 app.post("/registration", async (req, res) => {
@@ -272,6 +257,34 @@ app.post("/registration", async (req, res) => {
     });
   }
 });
+
+
+app.get("/", (req, res)=>{
+    res.send("The server is running")
+    
+})
+
+// user realted middleware
+
+app.post("/users", async (req, res) => {
+  const user = req.body;
+  user.role = 'user';
+  user.createdAt = new Date()
+
+  if (!userCollection) {
+    return res.status(503).send({ message: "User collection is not ready yet" });
+  }
+
+  const existingUser = await userCollection.findOne({ email: user.email });
+  if (existingUser) {
+    return res.send({ message: "User already exists" });
+  }
+
+  const result = await userCollection.insertOne(user);
+  res.send(result);
+});
+
+// Registration endpoint - requires verified Firebase token
 
 app.listen(port, ()=>{
     console.log(`Server is running on port ${port}`)
