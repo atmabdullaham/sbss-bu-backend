@@ -191,6 +191,8 @@ app.post("/users", async (req, res) => {
 // Programme Registration endpoint - accepts form submissions
 app.post("/registration", async (req, res) => {
   try {
+    console.log("Registration request received:", req.body);
+    
     const {
       name_bn,
       sabek_bortoman,
@@ -210,8 +212,23 @@ app.post("/registration", async (req, res) => {
       permanent_ward,
     } = req.body;
 
-   
-   
+    // Validate required fields
+    if (!name_bn || !phone_number || !transaction_Id) {
+      console.warn("Missing required fields");
+      return res.status(400).send({
+        success: false,
+        message: "Missing required fields: name_bn, phone_number, transaction_Id",
+      });
+    }
+
+    // Check if database collection is ready
+    if (!registrationsCollection) {
+      console.error("Registrations collection is not initialized");
+      return res.status(503).send({
+        success: false,
+        message: "Database not initialized. Please try again later.",
+      });
+    }
 
     // Create registration record
     const registration = {
@@ -233,10 +250,13 @@ app.post("/registration", async (req, res) => {
       permanent_ward,
       registration_status: "pending",
       registered_at: new Date(),
-      
+      ip_address: req.ip || req.connection.remoteAddress
     };
 
+    console.log("Attempting to insert registration...");
     const result = await registrationsCollection.insertOne(registration);
+    
+    console.log("Registration successful, insertedId:", result.insertedId);
 
     res.send({
       success: true,
@@ -244,10 +264,10 @@ app.post("/registration", async (req, res) => {
       insertedId: result.insertedId
     });
   } catch (err) {
-    console.error("Registration error:", err);
+    console.error("Registration error details:", err);
     res.status(500).send({ 
       success: false,
-      message: "Registration failed", 
+      message: "Registration failed: " + err.message, 
       error: err.message 
     });
   }
