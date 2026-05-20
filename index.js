@@ -191,8 +191,39 @@ app.post("/users", async (req, res) => {
 // Programme Registration endpoint - accepts form submissions
 app.post("/registration", async (req, res) => {
   try {
-    
-    
+    const {
+      name_bn,
+      sabek_bortoman,
+      songotonik_man,
+      daitto,
+      imageUrl,
+      organizational_branch,
+      tshirt_size,
+      sendmoney_number,
+      transaction_Id,
+      phone_number,
+      whatsapp_number,
+      present_area,
+      present_thana,
+      present_zilla,
+      permanent_union,
+      permanent_ward,
+    } = req.body;
+
+    // Validate required fields
+    if (!name_bn || !phone_number || !transaction_Id) {
+      return res.status(400).send({
+        success: false,
+        message: "Missing required fields: name_bn, phone_number, transaction_Id",
+      });
+    }
+
+    if (!registrationsCollection) {
+      return res.status(503).send({
+        success: false,
+        message: "Database not initialized",
+      });
+    }
 
     // Create registration record
     const registration = {
@@ -226,7 +257,11 @@ app.post("/registration", async (req, res) => {
     });
   } catch (err) {
     console.error("Registration error:", err);
-    res.status(500).send({ message: "Registration failed", error: err.message });
+    res.status(500).send({ 
+      success: false,
+      message: "Registration failed", 
+      error: err.message 
+    });
   }
 });
 
