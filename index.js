@@ -162,6 +162,11 @@ async function run() {
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("✅ Successfully connected to MongoDB!");
+    
+    // Start the server AFTER database connection is successful
+    app.listen(port, ()=>{
+      console.log(`Server is running on port ${port}`)
+    })
   } catch (err) {
     console.error("❌ MongoDB connection error:", err.message);
     console.error("Please check your MongoDB URI in .env file");
@@ -285,7 +290,3 @@ app.post("/users", async (req, res) => {
 });
 
 // Registration endpoint - requires verified Firebase token
-
-app.listen(port, ()=>{
-    console.log(`Server is running on port ${port}`)
-})
