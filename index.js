@@ -269,7 +269,36 @@ app.get("/", (req, res)=>{
     
 })
 
-// user realted middleware
+// Admin verification middleware
+const verifyAdmin = async (req, res, next) => {
+  const email = req.params.email;
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+
+  try {
+    const idToken = token.split(' ')[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    
+    if (decoded.email !== email) {
+      return res.status(403).send({ message: "Token email mismatch" });
+    }
+
+    const user = await userCollection.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).send({ message: "Admin access required" });
+    }
+
+    req.userEmail = email;
+    next();
+  } catch (err) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+};
+
+// user related middleware
 
 app.post("/users", async (req, res) => {
   const user = req.body;
@@ -287,6 +316,216 @@ app.post("/users", async (req, res) => {
 
   const result = await userCollection.insertOne(user);
   res.send(result);
+});
+
+// Check if user is admin
+app.get("/users/admin/:email", verifyFBToken, async (req, res) => {
+  try {
+    const email = req.params.email;
+    
+    if (!userCollection) {
+      return res.status(503).send({ message: "User collection is not ready yet" });
+    }
+
+    const user = await userCollection.findOne({ email });
+    const isAdmin = user && user.role === 'admin';
+    
+    res.send({ admin: isAdmin });
+  } catch (err) {
+    res.status(500).send({ message: "Error checking admin status" });
+  }
+});
+
+// ADMIN DASHBOARD ENDPOINTS
+
+// Get dashboard statistics
+app.get("/admin/statistics", verifyFBToken, async (req, res) => {
+  try {
+    const email = req.decoded_email;
+    
+    if (!userCollection || !registrationsCollection) {
+      return res.status(503).send({ message: "Database not ready" });
+    }
+
+    const user = await userCollection.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).send({ message: "Admin access required" });
+    }
+
+    // Get all registrations for statistics
+    const allRegistrations = await registrationsCollection.find({}).toArray();
+
+    // Calculate sabek/bortoman counts
+    const sabek = allRegistrations.filter(r => r.sabek_bortoman === 'sabek').length;
+    const bortoman = allRegistrations.filter(r => r.sabek_bortoman === 'bortoman').length;
+
+    // Calculate member/associate counts
+    const member = allRegistrations.filter(r => r.songotonik_man === 'member').length;
+    const associate = allRegistrations.filter(r => r.songotonik_man === 'associate').length;
+
+    // Combined counts
+    const sabek_member = allRegistrations.filter(r => r.sabek_bortoman === 'sabek' && r.songotonik_man === 'member').length;
+    const sabek_associate = allRegistrations.filter(r => r.sabek_bortoman === 'sabek' && r.songotonik_man === 'associate').length;
+    const bortoman_member = allRegistrations.filter(r => r.sabek_bortoman === 'bortoman' && r.songotonik_man === 'member').length;
+    const bortoman_associate = allRegistrations.filter(r => r.sabek_bortoman === 'bortoman' && r.songotonik_man === 'associate').length;
+
+    // Count by permanent_union
+    const permanentUnionCounts = {};
+    allRegistrations.forEach(r => {
+      const union = r.permanent_union || 'unknown';
+      permanentUnionCounts[union] = (permanentUnionCounts[union] || 0) + 1;
+    });
+
+    // Status counts
+    const pending = allRegistrations.filter(r => r.registration_status === 'pending').length;
+    const accepted = allRegistrations.filter(r => r.registration_status === 'accepted').length;
+    const rejected = allRegistrations.filter(r => r.registration_status === 'rejected').length;
+
+    res.send({
+      success: true,
+      data: {
+        sabek,
+        bortoman,
+        member,
+        associate,
+        combined: {
+          sabek_member,
+          sabek_associate,
+          bortoman_member,
+          bortoman_associate,
+        },
+        permanentUnionCounts,
+        statusCounts: {
+          pending,
+          accepted,
+          rejected,
+          total: allRegistrations.length,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Statistics error:", err);
+    res.status(500).send({ message: "Error fetching statistics", error: err.message });
+  }
+});
+
+// Get registrations by status
+app.get("/admin/registrations/:status", verifyFBToken, async (req, res) => {
+  try {
+    const email = req.decoded_email;
+    const status = req.params.status.toLowerCase();
+
+    if (!userCollection || !registrationsCollection) {
+      return res.status(503).send({ message: "Database not ready" });
+    }
+
+    const user = await userCollection.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).send({ message: "Admin access required" });
+    }
+
+    // Get search parameters
+    const { transaction_id, sendmoney_number } = req.query;
+    const filter = { registration_status: status };
+
+    if (transaction_id) {
+      filter.transaction_Id = { $regex: transaction_id, $options: 'i' };
+    }
+
+    if (sendmoney_number) {
+      filter.sendmoney_number = { $regex: sendmoney_number, $options: 'i' };
+    }
+
+    const registrations = await registrationsCollection
+      .find(filter)
+      .sort({ registered_at: -1 })
+      .toArray();
+
+    res.send({
+      success: true,
+      data: registrations,
+      count: registrations.length,
+    });
+  } catch (err) {
+    console.error("Error fetching registrations:", err);
+    res.status(500).send({ message: "Error fetching registrations", error: err.message });
+  }
+});
+
+// Update registration status
+app.patch("/admin/registrations/:id/status", verifyFBToken, async (req, res) => {
+  try {
+    const email = req.decoded_email;
+    const registrationId = req.params.id;
+    const { status } = req.body;
+
+    if (!userCollection || !registrationsCollection) {
+      return res.status(503).send({ message: "Database not ready" });
+    }
+
+    const user = await userCollection.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).send({ message: "Admin access required" });
+    }
+
+    // Validate status
+    const validStatuses = ['pending', 'accepted', 'rejected'];
+    if (!validStatuses.includes(status.toLowerCase())) {
+      return res.status(400).send({ message: "Invalid status value" });
+    }
+
+    const { ObjectId } = require('mongodb');
+    const result = await registrationsCollection.updateOne(
+      { _id: new ObjectId(registrationId) },
+      { $set: { registration_status: status.toLowerCase(), updated_at: new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "Registration not found" });
+    }
+
+    res.send({
+      success: true,
+      message: "Status updated successfully",
+    });
+  } catch (err) {
+    console.error("Error updating status:", err);
+    res.status(500).send({ message: "Error updating status", error: err.message });
+  }
+});
+
+// Delete registration
+app.delete("/admin/registrations/:id", verifyFBToken, async (req, res) => {
+  try {
+    const email = req.decoded_email;
+    const registrationId = req.params.id;
+
+    if (!userCollection || !registrationsCollection) {
+      return res.status(503).send({ message: "Database not ready" });
+    }
+
+    const user = await userCollection.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).send({ message: "Admin access required" });
+    }
+
+    const { ObjectId } = require('mongodb');
+    const result = await registrationsCollection.deleteOne(
+      { _id: new ObjectId(registrationId) }
+    );
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Registration not found" });
+    }
+
+    res.send({
+      success: true,
+      message: "Registration deleted successfully",
+    });
+  } catch (err) {
+    console.error("Error deleting registration:", err);
+    res.status(500).send({ message: "Error deleting registration", error: err.message });
+  }
 });
 
 // Registration endpoint - requires verified Firebase token
