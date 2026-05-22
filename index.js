@@ -30,7 +30,7 @@ if (fasdk) {
           privateKey,
         }),
       });
-      console.log('Firebase Admin initialized from FASDK env var');
+      // console.log('Firebase Admin initialized from FASDK env var');
       initialized = true;
     }
   } catch (err) {
@@ -51,13 +51,13 @@ if (!initialized) {
         privateKey: firebasePrivateKey,
       }),
     });
-    console.log('Firebase Admin initialized from FIREBASE_* environment variables');
+    
     initialized = true;
   }
 }
 
 if (!initialized) {
-  console.warn('Firebase Admin not initialized: missing credentials (FASDK or FIREBASE_*)');
+  // console.warn('Firebase Admin not initialized: missing credentials (FASDK or FIREBASE_*)');
 }
 
 const port = process.env.PORT || 5000;
@@ -118,7 +118,7 @@ const verifyFBToken = async(req, res, next)=>{
    try{
     const idToken = token.split(' ')[1]
     const decoded = await admin.auth().verifyIdToken(idToken)
-    console.log(decoded)
+    // console.log(decoded)
     req.decoded_email = decoded.email
    }catch(err){
     return res.status(401).send({message: "unauthorized access"})
@@ -130,7 +130,7 @@ next()
 
 
 const uri = process.env.URI
-console.log(process.env.URI)
+// console.log(process.env.URI)
 let userCollection;
 let registrationsCollection;
 
