@@ -376,6 +376,13 @@ app.get("/admin/statistics", verifyFBToken, async (req, res) => {
       permanentUnionCounts[union] = (permanentUnionCounts[union] || 0) + 1;
     });
 
+    // Count by tshirt_size
+    const tshirtSizeCounts = {};
+    allRegistrations.forEach(r => {
+      const size = r.tshirt_size || 'unknown';
+      tshirtSizeCounts[size] = (tshirtSizeCounts[size] || 0) + 1;
+    });
+
     // Status counts
     const pending = allRegistrations.filter(r => r.registration_status === 'pending').length;
     const accepted = allRegistrations.filter(r => r.registration_status === 'accepted').length;
@@ -395,6 +402,7 @@ app.get("/admin/statistics", verifyFBToken, async (req, res) => {
           bortoman_associate,
         },
         permanentUnionCounts,
+        tshirtSizeCounts,
         statusCounts: {
           pending,
           accepted,
