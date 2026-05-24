@@ -342,6 +342,7 @@ app.get("/users/admin/:email", verifyFBToken, async (req, res) => {
 app.get("/admin/statistics", verifyFBToken, async (req, res) => {
   try {
     const email = req.decoded_email;
+    const status = req.query.status; // Get status filter from query param
     
     if (!userCollection || !registrationsCollection) {
       return res.status(503).send({ message: "Database not ready" });
@@ -355,37 +356,44 @@ app.get("/admin/statistics", verifyFBToken, async (req, res) => {
     // Get all registrations for statistics
     const allRegistrations = await registrationsCollection.find({}).toArray();
 
+    // Determine which registrations to use for detailed stats
+    let registrationsForStats = allRegistrations;
+    if (status && status.toLowerCase() === 'accepted') {
+      registrationsForStats = allRegistrations.filter(r => r.registration_status === 'accepted');
+    }
+
     // Calculate sabek/bortoman counts
-    const sabek = allRegistrations.filter(r => r.sabek_bortoman === 'sabek').length;
-    const bortoman = allRegistrations.filter(r => r.sabek_bortoman === 'bortoman').length;
+    const sabek = registrationsForStats.filter(r => r.sabek_bortoman === 'sabek').length;
+    const bortoman = registrationsForStats.filter(r => r.sabek_bortoman === 'bortoman').length;
 
     // Calculate member/associate counts
-    const member = allRegistrations.filter(r => r.songotonik_man === 'member').length;
-    const associate = allRegistrations.filter(r => r.songotonik_man === 'associate').length;
+    const member = registrationsForStats.filter(r => r.songotonik_man === 'member').length;
+    const associate = registrationsForStats.filter(r => r.songotonik_man === 'associate').length;
 
     // Combined counts
-    const sabek_member = allRegistrations.filter(r => r.sabek_bortoman === 'sabek' && r.songotonik_man === 'member').length;
-    const sabek_associate = allRegistrations.filter(r => r.sabek_bortoman === 'sabek' && r.songotonik_man === 'associate').length;
-    const bortoman_member = allRegistrations.filter(r => r.sabek_bortoman === 'bortoman' && r.songotonik_man === 'member').length;
-    const bortoman_associate = allRegistrations.filter(r => r.sabek_bortoman === 'bortoman' && r.songotonik_man === 'associate').length;
+    const sabek_member = registrationsForStats.filter(r => r.sabek_bortoman === 'sabek' && r.songotonik_man === 'member').length;
+    const sabek_associate = registrationsForStats.filter(r => r.sabek_bortoman === 'sabek' && r.songotonik_man === 'associate').length;
+    const bortoman_member = registrationsForStats.filter(r => r.sabek_bortoman === 'bortoman' && r.songotonik_man === 'member').length;
+    const bortoman_associate = registrationsForStats.filter(r => r.sabek_bortoman === 'bortoman' && r.songotonik_man === 'associate').length;
 
     // Count by permanent_union
     const permanentUnionCounts = {};
-    allRegistrations.forEach(r => {
+    registrationsForStats.forEach(r => {
       const union = r.permanent_union || 'unknown';
       permanentUnionCounts[union] = (permanentUnionCounts[union] || 0) + 1;
     });
 
-    // Count by tshirt_size (only accepted registrations)
+    // Count by tshirt_size
     const tshirtSizeCounts = {};
-    allRegistrations
-      .filter(r => r.registration_status === 'accepted')
+    registrationsForStats
+      .filter(r => r.tshirt_size)
       .forEach(r => {
         const size = r.tshirt_size || 'unknown';
         tshirtSizeCounts[size] = (tshirtSizeCounts[size] || 0) + 1;
       });
+    tshirtSizeCounts.total = Object.values(tshirtSizeCounts).reduce((sum, val) => sum + val, 0);
 
-    // Status counts
+    // Status counts (always from all registrations)
     const pending = allRegistrations.filter(r => r.registration_status === 'pending').length;
     const accepted = allRegistrations.filter(r => r.registration_status === 'accepted').length;
     const rejected = allRegistrations.filter(r => r.registration_status === 'rejected').length;
