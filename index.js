@@ -133,6 +133,7 @@ const uri = process.env.URI
 // console.log(process.env.URI)
 let userCollection;
 let registrationsCollection;
+let messageCollection;
 
 // Validate MongoDB URI exists
 if (!uri) {
@@ -158,6 +159,7 @@ async function run() {
     const db = client.db("sbssbuDb");
     userCollection = db.collection("users");
     registrationsCollection = db.collection("registrations");
+    messageCollection = db.collection("messages");
     // const parcelCollection = db.collection("parcels");
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
@@ -263,6 +265,61 @@ app.post("/registration", async (req, res) => {
   }
 });
 
+// Contact Message endpoint - accepts contact form submissions
+app.post("/contact", async (req, res) => {
+  try {
+    console.log("Contact message received:", req.body);
+    
+    const { name, email, subject, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !subject || !message) {
+      console.warn("Missing required fields for contact");
+      return res.status(400).send({
+        success: false,
+        message: "Missing required fields: name, email, subject, message",
+      });
+    }
+
+    // Check if database collection is ready
+    if (!messageCollection) {
+      console.error("Message collection is not initialized");
+      return res.status(503).send({
+        success: false,
+        message: "Database not initialized. Please try again later.",
+      });
+    }
+
+    // Create message record
+    const contactMessage = {
+      name,
+      email,
+      subject,
+      message,
+      status: "new",
+      created_at: new Date(),
+      ip_address: req.ip || req.connection.remoteAddress
+    };
+
+    console.log("Attempting to insert contact message...");
+    const result = await messageCollection.insertOne(contactMessage);
+    
+    console.log("Message saved successfully, insertedId:", result.insertedId);
+
+    res.send({
+      success: true,
+      message: "আপনার বার্তা সফলভাবে পাঠানো হয়েছে। শীঘ্রই আমরা আপনার সাথে যোগাযোগ করব।",
+      insertedId: result.insertedId
+    });
+  } catch (err) {
+    console.error("Contact message error details:", err);
+    res.status(500).send({ 
+      success: false,
+      message: "বার্তা পাঠানো ব্যর্থ হয়েছে: " + err.message, 
+      error: err.message 
+    });
+  }
+});
 
 app.get("/", (req, res)=>{
     res.send("The server is running")
